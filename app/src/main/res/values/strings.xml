@@ -23,7 +23,12 @@
     <string name="warn_label">نسبة التنبيه المسبق (مثال: 80)</string>
     <string name="btn_start">تشغيل المراقبة</string>
     <string name="btn_stop">إيقاف</string>
+    <string name="btn_reset">تصفير العداد</string>
+    <string name="confirm_reset">هل تريد تصفير عداد الواي فاي والداتا؟</string>
+    <string name="yes">نعم</string>
+    <string name="no">إلغاء</string>
     <string name="note_text">العد يبدأ لحظة الضغط على تشغيل المراقبة، ويعتمد على عدادات الجهاز نفسه.</string>
     <string name="toast_started">بدأت المراقبة</string>
     <string name="toast_stopped">تم الإيقاف</string>
+    <string name="toast_reset">تم تصفير العداد</string>
 </resources>
