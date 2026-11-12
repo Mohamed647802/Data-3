@@ -10,7 +10,6 @@ import android.os.Handler
 import android.os.Looper
 import android.text.format.Formatter
 import android.widget.EditText
-import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.TextView
 import android.widget.Toast
@@ -38,8 +37,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvMobileLimit: TextView
     private lateinit var tvTotal: TextView
     private lateinit var tvSince: TextView
-    private lateinit var pbWifi: ProgressBar
-    private lateinit var pbMobile: ProgressBar
+    private lateinit var ringWifi: RingView
+    private lateinit var ringMobile: RingView
     private lateinit var etWifi: EditText
     private lateinit var etMobile: EditText
     private lateinit var etWarn: EditText
@@ -58,8 +57,8 @@ class MainActivity : AppCompatActivity() {
         tvMobileLimit = findViewById(R.id.tvMobileLimit)
         tvTotal = findViewById(R.id.tvTotal)
         tvSince = findViewById(R.id.tvSince)
-        pbWifi = findViewById(R.id.pbWifi)
-        pbMobile = findViewById(R.id.pbMobile)
+        ringWifi = findViewById(R.id.ringWifi)
+        ringMobile = findViewById(R.id.ringMobile)
         etWifi = findViewById(R.id.etWifi)
         etMobile = findViewById(R.id.etMobile)
         etWarn = findViewById(R.id.etWarn)
@@ -178,8 +177,22 @@ class MainActivity : AppCompatActivity() {
         tvMobile.text = f(s.mobile)
         tvWifiLimit.text = limitText(s.wifiLimit)
         tvMobileLimit.text = limitText(s.mobileLimit)
-        pbWifi.progress = Usage.pct(s.wifi, s.wifiLimit).coerceAtMost(100)
-        pbMobile.progress = Usage.pct(s.mobile, s.mobileLimit).coerceAtMost(100)
+
+        val wp = Usage.pct(s.wifi, s.wifiLimit)
+        val mp = Usage.pct(s.mobile, s.mobileLimit)
+        ringWifi.setRing(
+            ContextCompat.getColor(this, R.color.accent),
+            wp,
+            s.wifiLimit > 0,
+            if (s.wifiLimit > 0) "$wp%" else "--"
+        )
+        ringMobile.setRing(
+            ContextCompat.getColor(this, R.color.accent2),
+            mp,
+            s.mobileLimit > 0,
+            if (s.mobileLimit > 0) "$mp%" else "--"
+        )
+
         tvTotal.text = f(s.wifi + s.mobile)
         if (s.startTime > 0) {
             val t = SimpleDateFormat("HH:mm  dd/MM", Locale.getDefault()).format(Date(s.startTime))
