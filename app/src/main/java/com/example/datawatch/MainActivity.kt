@@ -3,89 +3,79 @@ package com.example.datawatch
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.text.format.Formatter
-import android.view.View
-import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.RadioButton
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private val h = Handler(Looper.getMainLooper())
     private val refresh = object : Runnable {
         override fun run() {
             render()
-            h.postDelayed(this, 5000)
+            h.postDelayed(this, 2000)
         }
     }
 
-    private lateinit var tvStatus: TextView
-    private lateinit var progress: ProgressBar
-    private lateinit var btnPerm: Button
-    private lateinit var etLimit: EditText
+    private lateinit var tvState: TextView
+    private lateinit var tvWifi: TextView
+    private lateinit var tvMobile: TextView
+    private lateinit var tvWifiLimit: TextView
+    private lateinit var tvMobileLimit: TextView
+    private lateinit var tvTotal: TextView
+    private lateinit var tvSince: TextView
+    private lateinit var pbWifi: ProgressBar
+    private lateinit var pbMobile: ProgressBar
+    private lateinit var etWifi: EditText
+    private lateinit var etMobile: EditText
     private lateinit var etWarn: EditText
-    private lateinit var etDay: EditText
-    private lateinit var rbGb: RadioButton
-    private lateinit var rbMb: RadioButton
-    private lateinit var rgSrc: RadioGroup
+    private lateinit var rbWifiMb: RadioButton
+    private lateinit var rbWifiGb: RadioButton
+    private lateinit var rbMobMb: RadioButton
+    private lateinit var rbMobGb: RadioButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        tvStatus = findViewById(R.id.tvStatus)
-        progress = findViewById(R.id.progress)
-        btnPerm = findViewById(R.id.btnPerm)
-        etLimit = findViewById(R.id.etLimit)
+        tvState = findViewById(R.id.tvState)
+        tvWifi = findViewById(R.id.tvWifi)
+        tvMobile = findViewById(R.id.tvMobile)
+        tvWifiLimit = findViewById(R.id.tvWifiLimit)
+        tvMobileLimit = findViewById(R.id.tvMobileLimit)
+        tvTotal = findViewById(R.id.tvTotal)
+        tvSince = findViewById(R.id.tvSince)
+        pbWifi = findViewById(R.id.pbWifi)
+        pbMobile = findViewById(R.id.pbMobile)
+        etWifi = findViewById(R.id.etWifi)
+        etMobile = findViewById(R.id.etMobile)
         etWarn = findViewById(R.id.etWarn)
-        etDay = findViewById(R.id.etDay)
-        rbGb = findViewById(R.id.rbGb)
-        rbMb = findViewById(R.id.rbMb)
-        rgSrc = findViewById(R.id.rgSrc)
+        rbWifiMb = findViewById(R.id.rbWifiMb)
+        rbWifiGb = findViewById(R.id.rbWifiGb)
+        rbMobMb = findViewById(R.id.rbMobMb)
+        rbMobGb = findViewById(R.id.rbMobGb)
 
         val p = Usage.prefs(this)
-        val lim = p.getFloat("limit", 0f)
-        if (lim > 0) {
-            etLimit.setText(if (lim % 1f == 0f) lim.toInt().toString() else lim.toString())
-        }
+        fill(etWifi, p.getFloat("wifiV", 0f))
+        fill(etMobile, p.getFloat("mobV", 0f))
+        if (p.getInt("wifiU", 1) == 1) rbWifiGb.isChecked = true else rbWifiMb.isChecked = true
+        if (p.getInt("mobU", 1) == 1) rbMobGb.isChecked = true else rbMobMb.isChecked = true
         etWarn.setText(p.getInt("warn", 80).toString())
-        etDay.setText(p.getInt("day", 1).toString())
-        if (p.getInt("unit", 1) == 1) rbGb.isChecked = true else rbMb.isChecked = true
-        val srcId = when (p.getInt("src", Usage.SRC_BOTH)) {
-            Usage.SRC_WIFI -> R.id.rbWifi
-            Usage.SRC_MOBILE -> R.id.rbMobile
-            else -> R.id.rbBoth
-        }
-        rgSrc.check(srcId)
 
-        btnPerm.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-        }
-        findViewById<Button>(R.id.btnSave).setOnClickListener { save() }
-        findViewById<Button>(R.id.btnRestart).setOnClickListener {
-            Usage.prefs(this).edit()
-                .putLong("custom", System.currentTimeMillis())
-                .remove("hitWarn")
-                .remove("hitLim")
-                .apply()
-            startMonitor()
-            Toast.makeText(this, R.string.reset_done, Toast.LENGTH_SHORT).show()
-        }
-        findViewById<Button>(R.id.btnStop).setOnClickListener {
-            Usage.prefs(this).edit().putBoolean("enabled", false).apply()
-            stopService(Intent(this, UsageService::class.java))
-            Toast.makeText(this, R.string.stopped, Toast.LENGTH_SHORT).show()
-        }
+        findViewById<TextView>(R.id.btnStart).setOnClickListener { start() }
+        findViewById<TextView>(R.id.btnStop).setOnClickListener { stop() }
 
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -97,52 +87,75 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun save() {
-        val p = Usage.prefs(this)
-        val day = (etDay.text.toString().toIntOrNull() ?: 1).coerceIn(1, 28)
-        val src = when (rgSrc.checkedRadioButtonId) {
-            R.id.rbWifi -> Usage.SRC_WIFI
-            R.id.rbMobile -> Usage.SRC_MOBILE
-            else -> Usage.SRC_BOTH
+    private fun fill(et: EditText, v: Float) {
+        if (v > 0f) {
+            et.setText(if (v % 1f == 0f) v.toInt().toString() else v.toString())
         }
-        val ed = p.edit()
-            .putFloat("limit", etLimit.text.toString().toFloatOrNull() ?: 0f)
-            .putInt("unit", if (rbGb.isChecked) 1 else 0)
-            .putInt("src", src)
-            .putInt("warn", (etWarn.text.toString().toIntOrNull() ?: 80).coerceIn(1, 99))
-            .putInt("day", day)
-            .putBoolean("enabled", true)
-            .remove("hitWarn")
-            .remove("hitLim")
-        if (day != p.getInt("day", 1)) ed.putLong("custom", 0L)
-        ed.apply()
-        startMonitor()
-        Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
     }
 
-    private fun startMonitor() {
-        if (Usage.hasAccess(this)) {
-            ContextCompat.startForegroundService(this, Intent(this, UsageService::class.java))
+    private fun saveInputs() {
+        val p = Usage.prefs(this)
+        val wv = etWifi.text.toString().toFloatOrNull() ?: 0f
+        val wu = if (rbWifiGb.isChecked) 1 else 0
+        val mv = etMobile.text.toString().toFloatOrNull() ?: 0f
+        val mu = if (rbMobGb.isChecked) 1 else 0
+        val warn = (etWarn.text.toString().toIntOrNull() ?: 80).coerceIn(1, 99)
+        val changed = wv != p.getFloat("wifiV", 0f) ||
+            wu != p.getInt("wifiU", 1) ||
+            mv != p.getFloat("mobV", 0f) ||
+            mu != p.getInt("mobU", 1) ||
+            warn != p.getInt("warn", 80)
+        val ed = p.edit()
+            .putFloat("wifiV", wv)
+            .putInt("wifiU", wu)
+            .putFloat("mobV", mv)
+            .putInt("mobU", mu)
+            .putInt("warn", warn)
+        if (changed) {
+            ed.remove("hitLimWifi").remove("hitWarnWifi")
+                .remove("hitLimMob").remove("hitWarnMob")
         }
+        ed.apply()
+    }
+
+    private fun start() {
+        saveInputs()
+        Usage.begin(this)
+        ContextCompat.startForegroundService(this, Intent(this, UsageService::class.java))
+        Toast.makeText(this, R.string.toast_started, Toast.LENGTH_SHORT).show()
+        render()
+    }
+
+    private fun stop() {
+        Usage.end(this)
+        stopService(Intent(this, UsageService::class.java))
+        Toast.makeText(this, R.string.toast_stopped, Toast.LENGTH_SHORT).show()
         render()
     }
 
     private fun f(x: Long): String = Formatter.formatFileSize(this, x)
 
+    private fun limitText(limit: Long): String {
+        return if (limit > 0) getString(R.string.of_limit, f(limit)) else getString(R.string.no_limit)
+    }
+
     private fun render() {
-        val ok = Usage.hasAccess(this)
-        btnPerm.visibility = if (ok) View.GONE else View.VISIBLE
-        if (!ok) {
-            tvStatus.text = getString(R.string.grant_msg)
-            return
-        }
         val s = Usage.snapshot(this)
-        var t = getString(R.string.status_fmt, f(s.wifi), f(s.mobile), f(s.counted))
-        if (s.limit > 0) {
-            t += getString(R.string.status_limit, f(s.limit), s.pct.toInt())
+        tvState.text = getString(if (s.running) R.string.state_on else R.string.state_off)
+        tvState.setTextColor(Color.parseColor(if (s.running) "#66BB6A" else "#EF5350"))
+        tvWifi.text = f(s.wifi)
+        tvMobile.text = f(s.mobile)
+        tvWifiLimit.text = limitText(s.wifiLimit)
+        tvMobileLimit.text = limitText(s.mobileLimit)
+        pbWifi.progress = Usage.pct(s.wifi, s.wifiLimit).coerceAtMost(100)
+        pbMobile.progress = Usage.pct(s.mobile, s.mobileLimit).coerceAtMost(100)
+        tvTotal.text = f(s.wifi + s.mobile)
+        if (s.startTime > 0) {
+            val t = SimpleDateFormat("HH:mm  dd/MM", Locale.getDefault()).format(Date(s.startTime))
+            tvSince.text = getString(R.string.since_label, t)
+        } else {
+            tvSince.text = getString(R.string.not_started)
         }
-        tvStatus.text = t
-        progress.progress = s.pct.toInt().coerceAtMost(100)
     }
 
     override fun onResume() {
@@ -153,5 +166,6 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         h.removeCallbacks(refresh)
+        saveInputs()
     }
 }
