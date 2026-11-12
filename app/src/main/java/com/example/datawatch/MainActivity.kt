@@ -14,6 +14,7 @@ import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -76,6 +77,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.btnStart).setOnClickListener { start() }
         findViewById<TextView>(R.id.btnStop).setOnClickListener { stop() }
+        findViewById<TextView>(R.id.btnReset).setOnClickListener { confirmReset() }
 
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -130,6 +132,35 @@ class MainActivity : AppCompatActivity() {
         Usage.end(this)
         stopService(Intent(this, UsageService::class.java))
         Toast.makeText(this, R.string.toast_stopped, Toast.LENGTH_SHORT).show()
+        render()
+    }
+
+    private fun confirmReset() {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.confirm_reset)
+            .setPositiveButton(R.string.yes) { _, _ -> doReset() }
+            .setNegativeButton(R.string.no, null)
+            .show()
+    }
+
+    private fun doReset() {
+        saveInputs()
+        val p = Usage.prefs(this)
+        if (p.getBoolean("enabled", false)) {
+            Usage.begin(this)
+            ContextCompat.startForegroundService(this, Intent(this, UsageService::class.java))
+        } else {
+            p.edit()
+                .putLong("sessWifi", 0L)
+                .putLong("sessMob", 0L)
+                .putLong("startTime", 0L)
+                .remove("hitLimWifi")
+                .remove("hitWarnWifi")
+                .remove("hitLimMob")
+                .remove("hitWarnMob")
+                .apply()
+        }
+        Toast.makeText(this, R.string.toast_reset, Toast.LENGTH_SHORT).show()
         render()
     }
 
