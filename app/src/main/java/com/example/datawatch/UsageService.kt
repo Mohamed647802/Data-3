@@ -23,11 +23,11 @@ class UsageService : Service() {
     private var screenOn = true
     private lateinit var nm: NotificationManager
 
-    // Power saving: 30s when screen is on, 5 min when screen is off
+    // Power saving: 30s when the screen is on, 2 min when it is off (no wake-ups)
     private val tick = object : Runnable {
         override fun run() {
             update()
-            h.postDelayed(this, if (screenOn) 30_000L else 300_000L)
+            h.postDelayed(this, if (screenOn) 30_000L else 120_000L)
         }
     }
 
@@ -35,7 +35,7 @@ class UsageService : Service() {
         override fun onReceive(c: Context, i: Intent) {
             screenOn = i.action == Intent.ACTION_SCREEN_ON
             h.removeCallbacks(tick)
-            if (screenOn) h.post(tick) else h.postDelayed(tick, 300_000L)
+            if (screenOn) h.post(tick) else h.postDelayed(tick, 120_000L)
         }
     }
 
@@ -64,6 +64,10 @@ class UsageService : Service() {
             buildLive(Usage.snapshot(this)),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         )
+        if (!Usage.prefs(this).getBoolean("enabled", false)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         h.removeCallbacks(tick)
         h.post(tick)
         return START_STICKY
@@ -91,7 +95,19 @@ class UsageService : Service() {
         )
     }
 
+    private fun line(nameRes: Int, used: Long, limit: Long): String {
+        val name = getString(nameRes)
+        return if (limit > 0) {
+            name + ": " + fmt(used) + " / " + fmt(limit) + " (" + Usage.pct(used, limit) + "%)"
+        } else {
+            name + ": " + fmt(used)
+        }
+    }
+
     private fun buildLive(s: Snapshot): Notification {
+        val wl = line(R.string.label_wifi, s.wifi, s.wifiLimit)
+        val ml = line(R.string.label_mobile, s.mobile, s.mobileLimit)
+        val top = maxOf(Usage.pct(s.wifi, s.wifiLimit), Usage.pct(s.mobile, s.mobileLimit))
         val b = NotificationCompat.Builder(this, "live")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
@@ -100,43 +116,51 @@ class UsageService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setContentIntent(openIntent())
-        if (!s.access) {
-            return b.setContentTitle(getString(R.string.need_access))
-                .setContentText(getString(R.string.open_app_hint))
-                .build()
+            .setContentTitle(wl)
+            .setContentText(ml)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(wl + "\n" + ml))
+        if (s.wifiLimit > 0 || s.mobileLimit > 0) {
+            b.setProgress(100, top.coerceAtMost(100), false)
         }
-        if (s.limit > 0) {
-            b.setContentTitle(fmt(s.counted) + " / " + fmt(s.limit) + "  (" + s.pct.toInt() + "%)")
-            b.setProgress(100, s.pct.toInt().coerceAtMost(100), false)
-        } else {
-            b.setContentTitle(getString(R.string.usage_title, fmt(s.counted)))
-        }
-        b.setContentText(getString(R.string.wifi_data, fmt(s.wifi), fmt(s.mobile)))
         return b.build()
     }
 
     private fun update() {
         val s = Usage.snapshot(this)
+        if (!s.running) {
+            stopSelf()
+            return
+        }
         nm.notify(1, buildLive(s))
-        if (!s.access || s.limit <= 0) return
+        checkLimit("Wifi", R.string.label_wifi, s.wifi, s.wifiLimit, 2)
+        checkLimit("Mob", R.string.label_mobile, s.mobile, s.mobileLimit, 4)
+    }
+
+    private fun checkLimit(key: String, nameRes: Int, used: Long, limit: Long, idBase: Int) {
+        if (limit <= 0) return
         val p = Usage.prefs(this)
+        val pct = Usage.pct(used, limit)
         val warn = p.getInt("warn", 80)
-        if (s.pct >= 100) {
-            if (p.getLong("hitLim", 0L) != s.start) {
+        val name = getString(nameRes)
+        if (pct >= 100) {
+            if (!p.getBoolean("hitLim" + key, false)) {
                 alert(
-                    2,
+                    idBase,
                     getString(R.string.limit_title),
-                    getString(R.string.limit_text, fmt(s.counted), fmt(s.limit))
+                    getString(R.string.limit_text, name, fmt(used), fmt(limit))
                 )
-                p.edit().putLong("hitLim", s.start).putLong("hitWarn", s.start).apply()
+                p.edit()
+                    .putBoolean("hitLim" + key, true)
+                    .putBoolean("hitWarn" + key, true)
+                    .apply()
             }
-        } else if (s.pct >= warn && p.getLong("hitWarn", 0L) != s.start) {
+        } else if (pct >= warn && !p.getBoolean("hitWarn" + key, false)) {
             alert(
-                3,
+                idBase + 1,
                 getString(R.string.warn_title),
-                getString(R.string.warn_text, s.pct.toInt(), fmt(s.counted), fmt(s.limit))
+                getString(R.string.warn_text, name, pct, fmt(used), fmt(limit))
             )
-            p.edit().putLong("hitWarn", s.start).apply()
+            p.edit().putBoolean("hitWarn" + key, true).apply()
         }
     }
 
