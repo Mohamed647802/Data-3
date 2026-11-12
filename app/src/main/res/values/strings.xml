@@ -1,19 +1,29 @@
 <resources>
     <string name="app_name">مراقب الاستهلاك</string>
+    <string name="title_main">مراقب الاستهلاك</string>
+    <string name="label_wifi">واي فاي</string>
+    <string name="label_mobile">داتا</string>
     <string name="ch_live">الاستهلاك الحالي</string>
     <string name="ch_alerts">تنبيهات الاستهلاك</string>
-    <string name="need_access">فعّل صلاحية الوصول لبيانات الاستخدام</string>
-    <string name="open_app_hint">افتح التطبيق واضغط على الزر الأول</string>
-    <string name="usage_title">الاستهلاك: %1$s</string>
-    <string name="wifi_data">واي فاي %1$s  •  داتا %2$s</string>
     <string name="limit_title">وصلت للحد المحدد</string>
-    <string name="limit_text">الاستهلاك %1$s من %2$s</string>
+    <string name="limit_text">%1$s: %2$s من %3$s</string>
     <string name="warn_title">اقتربت من الحد</string>
-    <string name="warn_text">استهلكت %1$d%% (%2$s من %3$s)</string>
-    <string name="reset_done">تم التصفير</string>
-    <string name="stopped">تم الإيقاف</string>
-    <string name="saved">تم الحفظ والتشغيل</string>
-    <string name="grant_msg">فعّل صلاحية الوصول لبيانات الاستخدام من الزر بالأسفل ثم اختر التطبيق وفعّله.</string>
-    <string name="status_fmt">واي فاي: %1$s\nداتا: %2$s\nالمحسوب: %3$s</string>
-    <string name="status_limit"> من %1$s (%2$d%%)</string>
+    <string name="warn_text">%1$s: وصلت إلى %2$d%% (%3$s من %4$s)</string>
+    <string name="state_on">المراقبة تعمل</string>
+    <string name="state_off">المراقبة متوقفة</string>
+    <string name="of_limit">من %1$s</string>
+    <string name="no_limit">بدون حد</string>
+    <string name="total_label">الإجمالي</string>
+    <string name="since_label">بدأ العد: %1$s</string>
+    <string name="not_started">لم يبدأ العد بعد</string>
+    <string name="limits_title">حدود الاستهلاك</string>
+    <string name="hint_limit">الحد (صفر = بدون حد)</string>
+    <string name="unit_mb">ميجا</string>
+    <string name="unit_gb">جيجا</string>
+    <string name="warn_label">نسبة التنبيه المسبق (مثال: 80)</string>
+    <string name="btn_start">تشغيل المراقبة</string>
+    <string name="btn_stop">إيقاف</string>
+    <string name="note_text">العد يبدأ لحظة الضغط على تشغيل المراقبة، ويعتمد على عدادات الجهاز نفسه.</string>
+    <string name="toast_started">بدأت المراقبة</string>
+    <string name="toast_stopped">تم الإيقاف</string>
 </resources>
